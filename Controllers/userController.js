@@ -1,4 +1,6 @@
 const Book = require("../Models/Book");
+const { randomUUID } = require('crypto');
+const ExcelJS = require('exceljs');
 
 // Generate numeric random serial
 function generateNumericSerial(length = 10) {
@@ -10,44 +12,50 @@ function generateNumericSerial(length = 10) {
   return serial;
 }
 
-exports.createBooks = async (req, res) => {
-  try {
-    const { bookName, count } = req.body;
-
-    if (!bookName || !count) {
-      return res.status(400).json({ message: "bookName and count are required" });
-    }
-
-    const createdBooks = [];
-
-    for (let i = 0; i < count; i++) {
-      let serialNumber = generateNumericSerial(10);
-
-      // Ensure uniqueness
-      let exists = await Book.findOne({ serialNumber });
-      while (exists) {
-        serialNumber = generateNumericSerial(10);
-        exists = await Book.findOne({ serialNumber });
+exports.generateBooks = async (req, res) => {
+    try {
+      const { bookName, count } = req.body;
+  
+      if (!bookName || !count) {
+        return res.status(400).json({ message: "bookName and count are required." });
       }
-
-      const newBook = await Book.create({
-        serialNumber,
-        bookName,
+  
+      const numberOfBooks = parseInt(count);
+      if (isNaN(numberOfBooks) || numberOfBooks <= 0) {
+        return res.status(400).json({ message: "count must be a positive number." });
+      }
+  
+      const booksToInsert = [];
+  
+      for (let i = 0; i < numberOfBooks; i++) {
+        let serialNumber;
+        let isUnique = false;
+  
+        // ensure unique serial number
+        while (!isUnique) {
+          serialNumber = randomUUID(); // generates a random unique ID
+          const exists = await Book.findOne({ serialNumber });
+          if (!exists) isUnique = true;
+        }
+  
+        booksToInsert.push({
+          bookName,
+          serialNumber,
+        });
+      }
+  
+      const createdBooks = await Book.insertMany(booksToInsert);
+  
+      return res.status(201).json({
+        message: `${createdBooks.length} books created successfully.`,
+        books: createdBooks,
       });
-
-      createdBooks.push(newBook);
+    } catch (error) {
+      console.error("Error generating books:", error);
+      res.status(500).json({ message: "Internal server error", error: error.message });
     }
-
-    return res.status(201).json({
-      message: "Serial Numbers Generated Successfully",
-      data: createdBooks,
-    });
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Server Error" });
-  }
-};
+  };
+  
 
 
 exports.verifyBook = async (req, res) => {
@@ -86,3 +94,46 @@ exports.verifyBook = async (req, res) => {
       return res.status(500).json({ message: "Server Error" });
     }
   };
+
+
+  exports.getUnverifiedBookUrls = async (req, res) => {
+    try {
+        // 1️⃣ Fetch all unverified books
+        const unverifiedBooks = await Book.find({ verified: false }, 'serialNumber');
+        
+        // 2️⃣ Prepare URLs
+        const domain = 'https://www.securemybook.com/';
+        const urls = unverifiedBooks.map(book => `${domain}${book.serialNumber}`);
+    
+        // 3️⃣ Create a new workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Unverified Books');
+    
+        // 4️⃣ Add header
+        worksheet.columns = [{ header: 'URLs', key: 'url', width: 50 }];
+    
+        // 5️⃣ Add all URLs as rows
+        urls.forEach(url => worksheet.addRow({ url }));
+    
+        // 6️⃣ Set response headers for Excel download
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+        res.setHeader(
+          'Content-Disposition',
+          'attachment; filename="Unverified_Books.xlsx"'
+        );
+    
+        // 7️⃣ Write Excel file to response
+        await workbook.xlsx.write(res);
+        res.status(200).end();
+      } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Server error while generating Excel file',
+        });
+      }
+  };
+  

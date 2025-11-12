@@ -70,11 +70,11 @@ exports.verifyBook = async (req, res) => {
       const book = await Book.findOne({ serialNumber });
   
       if (!book) {
-        return res.status(404).json({ message: "Invalid Serial Number" });
+        return res.status(404).json({ message: "Invalid Serial Number" ,success:false});
       }
   
       if (book.verified === true) {
-        return res.status(400).json({ message: "This book is already verified" });
+        return res.status(400).json({ message: "This book is already verified" ,success:false});
       }
   
       // Update verification status and user details
@@ -86,12 +86,13 @@ exports.verifyBook = async (req, res) => {
   
       return res.status(200).json({
         message: "Book verified successfully",
-        data: book
+        data: book,
+        success:true
       });
   
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: "Server Error" });
+      return res.status(500).json({ message: "Server Error" ,success:false});
     }
   };
 

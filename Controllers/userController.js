@@ -63,14 +63,14 @@ exports.verifyBook = async (req, res) => {
       const { serialNumber, userName, phoneNumber } = req.body;
   
       if (!serialNumber || !userName || !phoneNumber) {
-        return res.status(400).json({ message: "serialNumber, userName, and phoneNumber are required" });
+        return res.status(400).json({ message: "This copy of the book i a pirated version" });
       }
   
       // Find the book by serial
       const book = await Book.findOne({ serialNumber });
   
       if (!book) {
-        return res.status(404).json({ message: "Invalid Serial Number" ,success:false});
+        return res.status(404).json({ message: "This copy of the book i a pirated version" ,success:false});
       }
   
       if (book.verified === true) {
@@ -97,44 +97,90 @@ exports.verifyBook = async (req, res) => {
   };
 
 
-  exports.getUnverifiedBookUrls = async (req, res) => {
-    try {
-        // 1️⃣ Fetch all unverified books
-        const unverifiedBooks = await Book.find({ verified: false }, 'serialNumber');
+//   exports.getUnverifiedBookUrls = async (req, res) => {
+//     try {
+//         // 1️⃣ Fetch all unverified books
+//         const unverifiedBooks = await Book.find({ verified: false }, 'serialNumber');
         
-        // 2️⃣ Prepare URLs
-        const domain = 'https://www.securemybook.com/';
-        const urls = unverifiedBooks.map(book => `${domain}${book.serialNumber}`);
+//         // 2️⃣ Prepare URLs
+//         const domain = 'https://www.securemybook.com/';
+//         const urls = unverifiedBooks.map(book => `${domain}${book.serialNumber}`);
     
-        // 3️⃣ Create a new workbook and worksheet
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Unverified Books');
+//         // 3️⃣ Create a new workbook and worksheet
+//         const workbook = new ExcelJS.Workbook();
+//         const worksheet = workbook.addWorksheet('Unverified Books');
     
-        // 4️⃣ Add header
-        worksheet.columns = [{ header: 'URLs', key: 'url', width: 50 }];
+//         // 4️⃣ Add header
+//         worksheet.columns = [{ header: 'URLs', key: 'url', width: 50 }];
     
-        // 5️⃣ Add all URLs as rows
-        urls.forEach(url => worksheet.addRow({ url }));
+//         // 5️⃣ Add all URLs as rows
+//         urls.forEach(url => worksheet.addRow({ url }));
     
-        // 6️⃣ Set response headers for Excel download
-        res.setHeader(
-          'Content-Type',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        );
-        res.setHeader(
-          'Content-Disposition',
-          'attachment; filename="Unverified_Books.xlsx"'
-        );
+//         // 6️⃣ Set response headers for Excel download
+//         res.setHeader(
+//           'Content-Type',
+//           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+//         );
+//         res.setHeader(
+//           'Content-Disposition',
+//           'attachment; filename="Unverified_Books.xlsx"'
+//         );
     
-        // 7️⃣ Write Excel file to response
-        await workbook.xlsx.write(res);
-        res.status(200).end();
-      } catch (error) {
-        console.error('Error generating Excel file:', error);
-        res.status(500).json({
-          success: false,
-          message: 'Server error while generating Excel file',
-        });
-      }
+//         // 7️⃣ Write Excel file to response
+//         await workbook.xlsx.write(res);
+//         res.status(200).end();
+//       } catch (error) {
+//         console.error('Error generating Excel file:', error);
+//         res.status(500).json({
+//           success: false,
+//           message: 'Server error while generating Excel file',
+//         });
+//       }
+//   };
+exports.getUnverifiedBookUrls = async (req, res) => {
+    try {
+      // 1️⃣ Fetch latest 200 unverified books (sorted by newest first)
+      const unverifiedBooks = await Book.find(
+        { verified: false },
+        'serialNumber'
+      )
+        .sort({ createdAt: -1 }) // newest first
+        .limit(200);
+  
+      // 2️⃣ Prepare URLs
+      const domain = 'https://www.securemybook.com/';
+      const urls = unverifiedBooks.map(book => `${domain}${book.serialNumber}`);
+  
+      // 3️⃣ Create workbook and sheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Unverified Books');
+  
+      // 4️⃣ Add header
+      worksheet.columns = [{ header: 'URLs', key: 'url', width: 50 }];
+  
+      // 5️⃣ Add rows
+      urls.forEach(url => worksheet.addRow({ url }));
+  
+      // 6️⃣ Excel response headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="Latest_200_Unverified_Books.xlsx"'
+      );
+  
+      // 7️⃣ Send Excel file
+      await workbook.xlsx.write(res);
+      res.status(200).end();
+  
+    } catch (error) {
+      console.error('Error generating Excel file:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error while generating Excel file',
+      });
+    }
   };
   

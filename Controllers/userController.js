@@ -1,4 +1,5 @@
 const Book = require("../Models/Book");
+const ErrorBook = require("../Models/Error");
 const { randomUUID } = require('crypto');
 const ExcelJS = require('exceljs');
 
@@ -63,6 +64,13 @@ exports.verifyBook = async (req, res) => {
       const { serialNumber, userName, phoneNumber } = req.body;
   
       if (!serialNumber || !userName || !phoneNumber) {
+
+        await ErrorBook.create({
+          serialNumber: serialNumber || "UNKNOWN",
+          phoneNumber,
+          bookName: "",
+          errorMessage: "Missing required fields"
+        });
         return res.status(400).json({ message: "This copy of the book i a pirated version" });
       }
   
@@ -70,10 +78,26 @@ exports.verifyBook = async (req, res) => {
       const book = await Book.findOne({ serialNumber });
   
       if (!book) {
+
+        await ErrorBook.create({
+          serialNumber,
+          phoneNumber,
+          bookName: "",
+          errorMessage: "Serial number does not exist / pirated copy"
+        });
+
         return res.status(404).json({ message: "This copy of the book i a pirated version" ,success:false});
       }
   
       if (book.verified === true) {
+
+        await ErrorBook.create({
+          serialNumber,
+          phoneNumber,
+          bookName: book.bookName,
+          errorMessage: "Book already verified"
+        });
+        
         return res.status(400).json({ message: "This book is already verified" ,success:false});
       }
   
@@ -145,7 +169,7 @@ exports.getUnverifiedBookUrls = async (req, res) => {
         'serialNumber'
       )
         .sort({ createdAt: -1 }) // newest first
-        .limit(200);
+        .limit(20200);
   
       // 2️⃣ Prepare URLs
       const domain = 'https://www.securemybook.com/';
@@ -168,7 +192,7 @@ exports.getUnverifiedBookUrls = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="Latest_200_Unverified_Books.xlsx"'
+        'attachment; filename="Latest_2O200_Unverified_Books.xlsx"'
       );
   
       // 7️⃣ Send Excel file

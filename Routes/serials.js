@@ -8,4 +8,5 @@ router.post('/generate', serialCtrl.generateBooks);
 router.post("/verify-book", serialCtrl.verifyBook);
 
 router.get('/geturl',serialCtrl.getUnverifiedBookUrls )
+router.get('/errorbooks',serialCtrl.getAllErrorBooks)
 module.exports = router;

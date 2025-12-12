@@ -91,6 +91,18 @@ exports.verifyBook = async (req, res) => {
   
       if (book.verified === true) {
 
+
+        if (book.phoneNumber === phoneNumber) {
+        return res.status(200).json({
+          message: "This book is already verified by you",
+          verifiedBy: {
+            name: book.userName,
+            phone: book.phoneNumber
+          },
+          success: true
+        });
+      }
+
         await ErrorBook.create({
           serialNumber,
           phoneNumber,
@@ -169,7 +181,7 @@ exports.getUnverifiedBookUrls = async (req, res) => {
         'serialNumber'
       )
         .sort({ createdAt: -1 }) // newest first
-        .limit(20200);
+        .limit(20500);
   
       // 2️⃣ Prepare URLs
       const domain = 'https://www.securemybook.com/';
@@ -192,7 +204,7 @@ exports.getUnverifiedBookUrls = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        'attachment; filename="Latest_2O200_Unverified_Books.xlsx"'
+        'attachment; filename="Latest_2O500_Unverified_Books.xlsx"'
       );
   
       // 7️⃣ Send Excel file
@@ -208,3 +220,97 @@ exports.getUnverifiedBookUrls = async (req, res) => {
     }
   };
   
+
+// exports.getAllErrorBooks = async (req, res) => {
+//   try {
+//     const result = await ErrorBook.aggregate([
+//       {
+//         $lookup: {
+//           from: "books",                 // collection name in MongoDB
+//           localField: "serialNumber",    // field in ErrorBook
+//           foreignField: "serialNumber",  // field in Book
+//           as: "originalBookData"
+//         }
+//       },
+//       {
+//         $addFields: {
+//           originalBookData: { $arrayElemAt: ["$originalBookData", 0] }
+//         }
+//       }
+//     ]);
+
+//     return res.status(200).json({
+//       success: true,
+//       data: result
+//     });
+
+//   } catch (error) {
+//     console.error("Error fetching data:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error"
+//     });
+//   }
+// };
+
+
+exports.getAllErrorBooks = async (req, res) => {
+  try {
+    // Fetch all errorBooks
+    const errors = await ErrorBook.find().lean();
+
+    const rows = [];
+
+    for (const err of errors) {
+      const book = await Book.findOne({ serialNumber: err.serialNumber }).lean();
+
+      rows.push({
+        serialNumber: err.serialNumber,
+        verifiedByPhone: book ? book.phoneNumber : "Not Verified",
+        verifiedByName: book ? book.userName : "Not Verified",
+        errorPhoneNumber: err.phoneNumber,
+        errorMessage: err.errorMessage,
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Error Books Report");
+
+    worksheet.addRow([
+      "Serial Number",
+      "Verified By (Name)",
+      "Verified By (Phone)",
+      "Error Phone Number",
+      "Error Message",
+    ]);
+
+    rows.forEach((row) => {
+      worksheet.addRow([
+        row.serialNumber,
+        row.verifiedByName,
+        row.verifiedByPhone,
+        row.errorPhoneNumber,
+        row.errorMessage,
+      ]);
+    });
+
+    const fileName = "ErrorBooksReport.xlsx";
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error("Excel Generate Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating Excel",
+    });
+  }
+};
+

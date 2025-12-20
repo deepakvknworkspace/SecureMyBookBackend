@@ -169,7 +169,7 @@ exports.getAllErrorBooks = async (req, res) => {
       },
       {
         $match: {
-          totalErrorEntries: { $gt: 30 } // ONLY books with > 30 errors
+          totalErrorEntries: { $gt: 5 } // ONLY books with > 30 errors
         }
       }
     ]);

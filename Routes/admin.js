@@ -8,4 +8,5 @@ const { verifyToken } = require("../Middleware/authenticate");
 //router.post("/register", adminCtrl.registerUser);
 router.post("/login", adminCtrl.loginUser);
 router.get("/stats",verifyToken, adminCtrl.getBookStats);
+router.get("/errorbooks",verifyToken, adminCtrl.getAllErrorBooks);
 module.exports = router;

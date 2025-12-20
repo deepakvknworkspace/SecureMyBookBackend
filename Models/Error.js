@@ -13,6 +13,10 @@ const errorSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+   verifiedBy: {
+    type: String,
+    required: true
+  },
   errorMessage: {
     type: String,
     required: true

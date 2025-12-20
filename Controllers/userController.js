@@ -68,6 +68,7 @@ exports.verifyBook = async (req, res) => {
         await ErrorBook.create({
           serialNumber: serialNumber || "UNKNOWN",
           phoneNumber,
+          verifiedBy:userName,
           bookName: "",
           errorMessage: "Missing required fields"
         });
@@ -82,6 +83,7 @@ exports.verifyBook = async (req, res) => {
         await ErrorBook.create({
           serialNumber,
           phoneNumber,
+          verifiedBy:userName,
           bookName: "",
           errorMessage: "Serial number does not exist / pirated copy"
         });
@@ -106,6 +108,7 @@ exports.verifyBook = async (req, res) => {
         await ErrorBook.create({
           serialNumber,
           phoneNumber,
+          verifiedBy:userName,
           bookName: book.bookName,
           errorMessage: "Book already verified"
         });

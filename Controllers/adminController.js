@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Admin=require('../Models/Admin')
 const Book = require("../Models/Book");
+const ErrorBook=require('../Models/Error')
 /* ================= USER REGISTRATION ================= */
 exports.registerUser = async (req, res) => {
 
@@ -144,5 +145,92 @@ exports.getBookStats = async (req, res) => {
     });
   }
 };
+
+
+exports.getAllErrorBooks = async (req, res) => {
+  try {
+    /**
+     * 1️⃣ Aggregate errors per book
+     *    - count errors
+     *    - collect unique (name + phone)
+     */
+    const errorAgg = await ErrorBook.aggregate([
+      {
+        $group: {
+          _id: "$serialNumber",
+          totalErrorEntries: { $sum: 1 },
+          errorReportedBy: {
+            $addToSet: {
+              name: "$verifiedBy",
+              phone: "$phoneNumber"
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          totalErrorEntries: { $gt: 30 } // ONLY books with > 30 errors
+        }
+      }
+    ]);
+
+    if (!errorAgg.length) {
+      return res.status(200).json({
+        success: true,
+        totalBooks: 0,
+        data: []
+      });
+    }
+
+    /**
+     * 2️⃣ Fetch book details
+     */
+    const serialNumbers = errorAgg.map(e => e._id);
+
+    const books = await Book.find({
+      serialNumber: { $in: serialNumbers }
+    }).lean();
+
+    const bookMap = {};
+    books.forEach(book => {
+      bookMap[book.serialNumber] = book;
+    });
+
+    /**
+     * 3️⃣ Build final response
+     */
+    const result = errorAgg.map(err => {
+      const book = bookMap[err._id];
+
+      return {
+        serialNumber: err._id,
+        bookName: book?.bookName || null,
+        totalErrorEntries: err.totalErrorEntries,
+
+        // 👇 PERSONS WHO REPORTED THE ERROR
+        errorReportedBy: err.errorReportedBy
+      };
+    });
+
+    /**
+     * 4️⃣ Send response
+     */
+    res.status(200).json({
+      success: true,
+      totalBooks: result.length,
+      data: result
+    });
+
+  } catch (error) {
+    console.error("Get Error Books Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching error books"
+    });
+  }
+};
+
+
+
 
 

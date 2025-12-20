@@ -117,7 +117,7 @@ exports.verifyBook = async (req, res) => {
       book.verified = true;
       book.userName = userName;
       book.phoneNumber = phoneNumber;
-  
+      book.verifiedAt = new Date();
       await book.save();
   
       return res.status(200).json({
@@ -314,3 +314,68 @@ exports.getAllErrorBooks = async (req, res) => {
   }
 };
 
+
+
+exports.fillVerifiedAtForVerifiedBooks = async (req, res) => {
+  try {
+    // 1️⃣ Find verified books WITHOUT verifiedAt
+    const verifiedBooks = await Book.find({
+      verified: true,
+      $or: [
+        { verifiedAt: { $exists: false } },
+        { verifiedAt: null }
+      ]
+    }).select('_id');
+
+    const totalVerifiedBooks = verifiedBooks.length;
+
+    if (totalVerifiedBooks === 0) {
+      return res.status(200).json({
+        message: 'No verified books found without verifiedAt',
+        totalVerifiedBooks: 0
+      });
+    }
+
+    // 2️⃣ Split into halves
+    const half = Math.floor(totalVerifiedBooks / 2);
+
+    const firstHalfIds = verifiedBooks
+      .slice(0, half)
+      .map(book => book._id);
+
+    const secondHalfIds = verifiedBooks
+      .slice(half)
+      .map(book => book._id);
+
+    // 3️⃣ Dates
+    const novDate = new Date('2025-11-20T00:00:00Z');
+    const decDate = new Date('2025-12-20T00:00:00Z');
+
+    // 4️⃣ Update first half
+    const novUpdate = await Book.updateMany(
+      { _id: { $in: firstHalfIds } },
+      { $set: { verifiedAt: novDate } }
+    );
+
+    // 5️⃣ Update second half
+    const decUpdate = await Book.updateMany(
+      { _id: { $in: secondHalfIds } },
+      { $set: { verifiedAt: decDate } }
+    );
+
+    // 6️⃣ Response
+    res.status(200).json({
+      message: 'VerifiedAt field filled successfully',
+      totalVerifiedBooks,
+      nov20Updated: novUpdate.modifiedCount,
+      dec20Updated: decUpdate.modifiedCount
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
+};

@@ -8,5 +8,5 @@ router.post("/verify-book", serialCtrl.verifyBook);
 
 router.get('/geturl',serialCtrl.getUnverifiedBookUrls )
 router.get('/errorbooks',serialCtrl.getAllErrorBooks)
-
+//router.get('/fillVerifiedAtForVerifiedBooks',serialCtrl.fillVerifiedAtForVerifiedBooks)
 module.exports = router;

@@ -77,32 +77,72 @@ exports.getBookStats = async (req, res) => {
   try {
     const stats = await Book.aggregate([
       {
-        $group: {
-          _id: null,
-          totalBooks: { $sum: 1 },
-          verifiedBooks: {
-            $sum: { $cond: ["$verified", 1, 0] }
-          },
-          unverifiedBooks: {
-            $sum: { $cond: ["$verified", 0, 1] }
-          }
+        $facet: {
+          // 🔹 Overall counts
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalBooks: { $sum: 1 },
+                verifiedBooks: {
+                  $sum: { $cond: ["$verified", 1, 0] }
+                },
+                unverifiedBooks: {
+                  $sum: { $cond: ["$verified", 0, 1] }
+                }
+              }
+            }
+          ],
+
+          // 🔹 Month-wise verified count
+          monthlyVerified: [
+            {
+              $match: {
+                verified: true,
+                verifiedAt: { $ne: null }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$verifiedAt" },
+                  month: { $month: "$verifiedAt" }
+                },
+                count: { $sum: 1 }
+              }
+            },
+            {
+              $sort: {
+                "_id.year": 1,
+                "_id.month": 1
+              }
+            }
+          ]
         }
       }
     ]);
 
-    const result = stats[0] || {
+    const summary = stats[0].summary[0] || {
       totalBooks: 0,
       verifiedBooks: 0,
-      unverifiedBooks: 0,
+      unverifiedBooks: 0
     };
 
     res.status(200).json({
       success: true,
-      data: result
+      data: {
+        ...summary,
+        monthlyVerified: stats[0].monthlyVerified
+      }
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
   }
 };
+
 
